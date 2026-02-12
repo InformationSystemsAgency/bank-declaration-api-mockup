@@ -178,4 +178,4 @@ The application serves the original OpenAPI specification at `/api-spec` (YAML) 
 
 ## License
 
-This is a prototype implementation for the Central Bank of Armenia data exchange project.
+This is a prototype implementation for the X-Road data exchange project.
