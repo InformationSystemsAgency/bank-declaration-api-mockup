@@ -1,121 +1,115 @@
 # Usage and Testing Guide
 
-This guide walks you through testing the Bank Data API using the hosted test environment.
-
-## Prerequisites
-
-- Access credentials for the test environment
-- A tool to make HTTP requests (browser, curl, or any REST client)
+This guide explains how to test the Bank Data API endpoints using the SRC Test Console or direct API calls.
 
 ---
 
-## Step 1: Open the Test Declaration App
+## Testing Flow Overview
 
-Go to the test environment in your browser:
+The Bank Data API follows a 3-step asynchronous flow:
 
-**https://test-declaration.isaa.cloud/**
+### 1. Initiate Request
 
-![Test Declaration Website](images/TEST-DECLARATION-WEB.png)
+Send a request with a citizen's PSN (Personal Social Number). The API returns a `sessionID` to track the request.
+
+```
+POST /src/initiate
+{"psn": "1234567890"}
+```
+
+### 2. Poll Status
+
+Use the `sessionID` to check if the data is ready. Keep polling until the status changes from PENDING.
+
+```
+POST /src/poll
+{"session_id": "<sessionID>"}
+```
+
+### 3. Retrieve Data
+
+Once the status is READY, retrieve the actual banking data.
+
+```
+POST /src/retrieve
+{"psn": "1234567890", "session_id": "<sessionID>"}
+```
 
 ---
 
-## Step 2: Authenticate
+## Session States
 
-Log in with your provided credentials. After successful authentication you will receive a Bearer token to use in subsequent API requests.
-
-![Authentication](images/TEST-DECLARATION-AUTH.png)
+| Status | HTTP Code | Meaning |
+|--------|-----------|---------|
+| **PENDING** | 202 | Consent being acquired or data being prepared |
+| **READY** | 200 | Data is available for retrieval |
+| **EXPIRED** | 404 | Session expired or not found |
+| **DENIED** | 590 | Citizen explicitly denied consent |
 
 ---
 
-## Step 3: Initiate a Data Request
+## Sample Test PSNs
 
-Run the initialization request using PSN `1234567890`:
+Use these PSN values to test different scenarios:
+
+| PSN | Scenario |
+|-----|----------|
+| `1234567890` | Citizen with banking data (returns sample data) |
+| `9876543210` | Different citizen with banking data |
+| `5555555555` | Citizen with all zero values |
+| `1111111111` | Citizen who will deny consent (DENIED state) |
+| `3333333333` | Citizen with slow processing (demonstrates PENDING state) |
+| `0000000000` | No data available (returns 404) |
+
+---
+
+## Using the Test Console
+
+1. **Authenticate** — Enter your bank API token in the Authentication section on the Test Console page.
+2. **Enter a PSN** — Type one of the sample PSNs above (e.g. `1234567890`) in the Citizen PSN field.
+3. **Click "Initiate Request"** — The response panel will show the result and a `sessionID` will be populated automatically.
+4. **Click "Poll Status"** — Check the session status. If PENDING, wait a moment and poll again.
+5. **Click "Retrieve Data"** — Once the status is READY, retrieve the banking data. The full response will be displayed in the response panel.
+
+---
+
+## Direct API Calls (cURL)
+
+You can also test the underlying bank API endpoints directly:
+
+**Initiate a data request:**
 
 ```bash
-curl -X GET "https://test-declaration.isaa.cloud/citizen/1234567890/BankingData" \
-     -H "Authorization: Bearer <token>" \
+curl -X GET "http://<host>/citizen/1234567890/BankingData" \
      -H "X-Request-ID: 12345678-1234-1234-1234-123456789012"
 ```
 
-You will receive a response containing a `sessionID`:
-
-```json
-{
-  "sessionID": "c1a35a20-427b-4492-904f-b91d9359cea1",
-  "expiresAt": "2024-01-15T10:30:00Z"
-}
-```
-
-![Declaration Initialization](images/TEST-DECLARATION-INITIALIZE.png)
-
----
-
-## Step 4: Poll Session Status
-
-Copy the `sessionID` from the previous response and check the session status:
+**Check session status:**
 
 ```bash
-curl -X GET "https://test-declaration.isaa.cloud/request/{sessionID}" \
-     -H "Authorization: Bearer <token>" \
+curl -X GET "http://<host>/request/<sessionID>" \
      -H "X-Request-ID: 12345678-1234-1234-1234-123456789012"
 ```
 
-![Declaration Poll](images/TEST-DECLARATION-POLL.png)
-
-- **HTTP 200** — Data is ready, proceed to Step 5.
-- **HTTP 202** — Still pending, wait a moment and poll again.
-- **HTTP 590** — Consent was denied.
-- **HTTP 404** — Session expired or not found.
-
----
-
-## Step 5: Retrieve the Data
-
-Once the status is **READY** (HTTP 200), retrieve the banking data:
+**Retrieve banking data:**
 
 ```bash
-curl -X GET "https://test-declaration.isaa.cloud/citizen/1234567890/BankingData/{sessionID}" \
-     -H "Authorization: Bearer <token>" \
+curl -X GET "http://<host>/citizen/1234567890/BankingData/<sessionID>" \
      -H "X-Request-ID: 12345678-1234-1234-1234-123456789012"
 ```
 
-![Declaration Retreive](images/TEST-DECLARATION-RETREIVE.png)
-
-You should see this response:
-
-```json
-{
-  "DebtSecurityInterest": 0,
-  "DepositInterest": 250000,
-  "NonPersonifiedIncome": 5640,
-  "SecuritiesDeductable": 45000
-}
-```
-
 ---
 
-## Step 6: Run All PSN Tests
+## Response Data Fields
 
-If the response for PSN `1234567890` matches the expected output above, proceed to test all other PSNs and compare with the expected results below.
+| Field | Description |
+|-------|-------------|
+| `DepositInterest` | Interest earned on deposits |
+| `DebtSecurityInterest` | Interest from debt securities |
+| `SecuritiesDeductable` | Deductible amount from securities |
+| `NonPersonifiedIncome` | Non-personified income amount |
 
-### Expected Responses
-
-| PSN | Expected Behavior | Expected Response |
-|-----|-------------------|-------------------|
-| `1234567890` | Returns sample banking data | `{"DepositInterest": 250000, "DebtSecurityInterest": 0, "SecuritiesDeductable": 45000, "NonPersonifiedIncome": 5640}` |
-| `9876543210` | Returns different banking data | `{"DepositInterest": 180000, "DebtSecurityInterest": 25000, "SecuritiesDeductable": 15000, "NonPersonifiedIncome": 3200}` |
-| `5555555555` | Returns all zero values | `{"DepositInterest": 0, "DebtSecurityInterest": 0, "SecuritiesDeductable": 0, "NonPersonifiedIncome": 0}` |
-| `1111111111` | Will deny consent | Poll returns **HTTP 590** (DENIED) |
-| `3333333333` | Slow processing | Poll returns **HTTP 202** (PENDING) for several seconds before becoming READY |
-| `0000000000` | No data available | Initialization returns **HTTP 404** |
-
-For each PSN, repeat Steps 3-5 replacing `1234567890` with the PSN you want to test.
-
----
-
-## Local Testing
-
-Replace `https://test-declaration.isaa.cloud` with `http://localhost:8080` in all curl commands above to test against a local instance. See the [Setup Guide](SETUP.md) for local installation instructions.
+> **Note:** All fields are mandatory and must be >= 0. A value of `0` indicates no data is available or consent was not given for that field.
 
 ---
 

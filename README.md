@@ -24,49 +24,12 @@ This application provides a REST API that allows the SRC to request banking data
 
 ## Session States
 
-- **PENDING** (HTTP 202) - Consent being acquired or data being prepared
-- **READY** (HTTP 200) - Data available for retrieval
-- **EXPIRED** (HTTP 404) - Session expired or not found
-- **DENIED** (HTTP 590) - Citizen explicitly denied consent
-
-## Quick Start with Docker
-
-The easiest way to run the application:
-
-```bash
-# Build and run with docker-compose
-docker-compose up --build
-
-# Or build and run manually
-docker build -t bank-mockup .
-docker run -p 8080:8080 bank-mockup
-```
-
-The server will be available at `http://localhost:8080`.
-
-## Local Installation
-
-Prerequisites:
-- Python 3.12+
-- pip
-
-1. Create and activate virtual environment:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-2. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-3. Run the application:
-```bash
-python run.py
-```
-
-The server will start on `http://localhost:8080` by default.
+| Status | HTTP Code | Meaning |
+|--------|-----------|---------|
+| **PENDING** | 202 | Consent being acquired or data being prepared |
+| **READY** | 200 | Data is available for retrieval |
+| **EXPIRED** | 404 | Session expired or not found |
+| **DENIED** | 590 | Citizen explicitly denied consent |
 
 ## Getting Started
 
@@ -75,118 +38,118 @@ The server will start on `http://localhost:8080` by default.
 3. **Usage and testing** — see [Usage and Testing](docs/USAGE.md)
 4. **Full API details and test data** — see [API Reference](docs/API.md)
 
+## Quick Start
+
+### Prerequisites
+
+| Requirement | Details |
+|-------------|---------|
+| `Python 3.12+` | Python 3.12 or higher must be installed |
+| `pip` | Python package manager (comes with Python) |
+| `Git` | To clone the repository |
+| `Docker` (optional) | If you prefer running via Docker instead of Python directly |
+
+### Clone the Repository
+
+```bash
+git clone git@github.com:InformationSystemsAgency/bank-declaration-api-mockup.git
+cd bank-declaration-api-mockup
+```
+
+### Option A: Local Python Setup
+
+```bash
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+python run.py
+```
+
+### Option B: Docker Setup
+
+```bash
+docker compose up --build -d
+```
+
+The server will start on `http://localhost:8080` by default.
+
+### Verify the Setup
+
+```bash
+# From your server (local check):
+curl http://localhost:8080/
+```
+
+If the setup is correct, you should see the API info page or a JSON response.
+
 ## Testing
-
-You can test the API using the hosted test environment or a local instance.
-
-- **Testing UI**: https://test-declaration.isaa.cloud/
-- **Local**: `http://localhost:8080` (see [Quick Start with Docker](#quick-start-with-docker) or [Local Installation](#local-installation))
 
 ### Sample PSNs for Testing
 
-The application includes mock data for testing different scenarios:
-
-| PSN | Behavior |
+| PSN | Scenario |
 |-----|----------|
-| `1234567890` | Returns sample banking data |
-| `9876543210` | Returns different banking data |
-| `5555555555` | Returns all zero values |
-| `1111111111` | Will deny consent |
-| `3333333333` | Slow processing (demonstrates PENDING state) |
+| `1234567890` | Citizen with banking data (returns sample data) |
+| `9876543210` | Different citizen with banking data |
+| `5555555555` | Citizen with all zero values |
+| `1111111111` | Citizen who will deny consent (DENIED state) |
+| `3333333333` | Citizen with slow processing (demonstrates PENDING state) |
 | `0000000000` | No data available (returns 404) |
 
-### Example API Flow
+### Direct API Calls (cURL)
 
-The examples below use the test environment URL. Replace `https://test-declaration.isaa.cloud` with `http://localhost:8080` for local testing.
-
-1. **Initiate data request:**
+**Initiate a data request:**
 ```bash
-curl -X GET "https://test-declaration.isaa.cloud/citizen/1234567890/BankingData" \
-     -H "Authorization: Bearer <token>" \
+curl -X GET "http://<host>/citizen/1234567890/BankingData" \
      -H "X-Request-ID: 12345678-1234-1234-1234-123456789012"
 ```
 
-Response:
-```json
-{
-  "sessionID": "c1a35a20-427b-4492-904f-b91d9359cea1",
-  "expiresAt": "2024-01-15T10:30:00Z"
-}
-```
-
-2. **Check session status:**
+**Check session status:**
 ```bash
-curl -X GET "https://test-declaration.isaa.cloud/request/{sessionID}" \
-     -H "Authorization: Bearer <token>" \
+curl -X GET "http://<host>/request/<sessionID>" \
      -H "X-Request-ID: 12345678-1234-1234-1234-123456789012"
 ```
 
-3. **Retrieve data (when status is READY):**
+**Retrieve banking data:**
 ```bash
-curl -X GET "https://test-declaration.isaa.cloud/citizen/1234567890/BankingData/{sessionID}" \
-     -H "Authorization: Bearer <token>" \
+curl -X GET "http://<host>/citizen/1234567890/BankingData/<sessionID>" \
      -H "X-Request-ID: 12345678-1234-1234-1234-123456789012"
 ```
 
-Response:
-```json
-{
-  "DepositInterest": 250000,
-  "DebtSecurityInterest": 0,
-  "SecuritiesDeductable": 45000,
-  "NonPersonifiedIncome": 5640
-}
-```
+## Response Data Fields
+
+| Field | Description |
+|-------|-------------|
+| `DepositInterest` | Interest earned on deposits |
+| `DebtSecurityInterest` | Interest from debt securities |
+| `SecuritiesDeductable` | Deductible amount from securities |
+| `NonPersonifiedIncome` | Non-personified income amount |
+
+> **Note:** All fields are mandatory and must be >= 0. A value of `0` indicates no data is available or consent was not given for that field.
 
 ## Configuration
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PORT` | Server port | `8080` |
-| `HOST` | Server host | `0.0.0.0` |
-| `FLASK_DEBUG` | Enable debug mode | `False` |
-| `LOG_LEVEL` | Logging level (DEBUG, INFO, WARNING, ERROR) | `INFO` |
-| `LOG_FORMAT` | Log format (simple, detailed, json) | `detailed` |
-| `LOG_FILE` | Optional log file path | Console only |
-| `SESSION_TTL_MINUTES` | Session timeout | `30` |
-| `RATE_LIMIT_WINDOW_SECONDS` | Rate limiting window | `60` |
-| `RATE_LIMIT_MAX_REQUESTS` | Max requests per window | `10` |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `8080` | Port the server will listen on |
+| `HOST` | `0.0.0.0` | Bind to all interfaces |
+| `FLASK_DEBUG` | `false` | Set to `true` only during development |
+| `LOG_LEVEL` | `INFO` | Logging verbosity: DEBUG, INFO, WARNING, ERROR, CRITICAL |
+| `LOG_FORMAT` | `detailed` | Log output format: simple, detailed, or json |
+| `SESSION_TTL_MINUTES` | `30` | How long sessions remain valid |
+| `RATE_LIMIT_MAX_REQUESTS` | `10` | Maximum requests per rate-limit window |
 
 ### Configuration File
 
-Copy `.env.example` to `.env` and customize:
 ```bash
 cp .env.example .env
-```
-
-### Docker Environment
-
-Pass environment variables to Docker:
-```bash
-docker run -p 8080:8080 \
-  -e LOG_LEVEL=DEBUG \
-  -e LOG_FORMAT=json \
-  bank-mockup
-```
-
-Or configure in `docker-compose.yml`:
-```yaml
-services:
-  bank-mockup:
-    build: .
-    ports:
-      - "8080:8080"
-    environment:
-      - LOG_LEVEL=DEBUG
-      - LOG_FORMAT=json
 ```
 
 ## Project Structure
 
 ```
-banks-declaration-mockup/
+bank-declaration-api-mockup/
 ├── app/
 │   ├── __init__.py              # Flask app factory
 │   ├── config.py                # Configuration management
@@ -208,18 +171,6 @@ banks-declaration-mockup/
 ├── docker-compose.yml           # Docker Compose configuration
 └── README.md                    # This file
 ```
-
-## Security Considerations
-
-This is a prototype implementation. In a production environment, consider:
-
-- Authentication and authorization (OAuth 2.0, API keys)
-- TLS/HTTPS encryption
-- Database persistence for sessions and audit logs
-- Rate limiting with Redis/database backend
-- Input sanitization and validation
-- Monitoring and alerting
-- Load balancing and high availability
 
 ## API Specification
 
