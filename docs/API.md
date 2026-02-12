@@ -8,10 +8,6 @@ API specification for secure data exchange between banks and the SRC (State Reve
 http://localhost:8080
 ```
 
-## Authentication
-
-This prototype does not require authentication. In production, implement proper authentication (OAuth 2.0, API keys, etc.).
-
 ---
 
 ## Endpoints
@@ -135,12 +131,12 @@ Banking data returned for a citizen.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `DepositInterest` | number | Interest from deposits (minimum: 0) |
+| `DepositInterest` | number | Interest earned on deposits (minimum: 0) |
 | `DebtSecurityInterest` | number | Interest from debt securities (minimum: 0) |
-| `SecuritiesDeductable` | number | Securities deductible amount (minimum: 0) |
-| `NonPersonifiedIncome` | number | Non-personified income (minimum: 0) |
+| `SecuritiesDeductable` | number | Deductible amount from securities (minimum: 0) |
+| `NonPersonifiedIncome` | number | Non-personified income amount (minimum: 0) |
 
-**Note:** All fields are mandatory. Zero values indicate either no such income or consent not given for that specific data element.
+> **Note:** All fields are mandatory. A value of `0` indicates no data is available or consent was not given for that field.
 
 ### PSN Format
 
@@ -199,16 +195,16 @@ When rate limited, the API returns HTTP 429 (Too Many Requests).
 
 ## Test Data
 
-For testing purposes, use these PSNs:
+Use these PSN values to test different scenarios:
 
-| PSN | Behavior |
+| PSN | Scenario |
 |-----|----------|
-| `1234567890` | Returns sample banking data |
-| `9876543210` | Returns different banking data |
-| `5555555555` | Returns all zero values |
-| `1111111111` | Denies consent (HTTP 590) |
-| `3333333333` | Slow processing (stays PENDING) |
-| `0000000000` | No data available (HTTP 404) |
+| `1234567890` | Citizen with banking data (returns sample data) |
+| `9876543210` | Different citizen with banking data |
+| `5555555555` | Citizen with all zero values |
+| `1111111111` | Citizen who will deny consent (DENIED state) |
+| `3333333333` | Citizen with slow processing (demonstrates PENDING state) |
+| `0000000000` | No data available (returns 404) |
 
 ---
 

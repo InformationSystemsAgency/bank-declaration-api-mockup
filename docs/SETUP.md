@@ -5,369 +5,161 @@ Complete setup documentation for the Bank Data API application.
 ## Table of Contents
 
 - [Prerequisites](#prerequisites)
-- [Option 1: Docker Setup (Recommended)](#option-1-docker-setup-recommended)
-- [Option 2: Local Setup (Without Docker)](#option-2-local-setup-without-docker)
-- [Configuration](#configuration)
-- [Verification](#verification)
-- [Troubleshooting](#troubleshooting)
+- [1.1 Clone the Repository](#11-clone-the-repository)
+- [1.2 Choose Your Setup Method](#12-choose-your-setup-method)
+- [1.5 Configure Environment](#15-configure-environment)
+- [1.6 Run the Server](#16-run-the-server)
+- [1.7 Verify the Setup](#17-verify-the-setup)
 
 ---
 
 ## Prerequisites
 
-### For Docker Setup
-- Docker Engine 20.10+
-- Docker Compose v2.0+
-
-### For Local Setup
-- Python 3.12+
-- pip (Python package manager)
-- Git
+| Requirement | Details |
+|-------------|---------|
+| `Python 3.12+` | Python 3.12 or higher must be installed |
+| `pip` | Python package manager (comes with Python) |
+| `Git` | To clone the repository |
+| `Docker` (optional) | If you prefer running via Docker instead of Python directly |
 
 ---
 
-## Option 1: Docker Setup (Recommended)
+## 1.1 Clone the Repository
 
-### Step 1: Clone the Repository
-
-```bash
-git clone <repository-url>
-cd src-banks-trigger-app
-```
-
-### Step 2: Configure Environment (Optional)
-
-Copy the example environment file:
+Get the [src-banks-trigger-app](https://github.com/InformationSystemsAgency/bank-declaration-api-mockup) repository onto your server:
 
 ```bash
-cp .env.example .env
-```
-
-Edit `.env` to customize settings:
-
-```bash
-# Server Configuration
-PORT=8080
-HOST=0.0.0.0
-
-# Logging Configuration
-LOG_LEVEL=INFO          # Options: DEBUG, INFO, WARNING, ERROR
-LOG_FORMAT=detailed     # Options: simple, detailed, json
-
-# Session Configuration
-SESSION_TTL_MINUTES=30
-
-# Rate Limiting
-RATE_LIMIT_WINDOW_SECONDS=60
-RATE_LIMIT_MAX_REQUESTS=10
-```
-
-### Step 3: Build and Run with Docker Compose
-
-```bash
-# Build and start the container
-docker compose up --build
-
-# Or run in detached mode (background)
-docker compose up -d --build
-```
-
-### Step 4: Verify the Installation
-
-```bash
-# Check container status
-docker compose ps
-
-# Check logs
-docker compose logs -f
-
-# Test the API
-curl http://localhost:8080/
-```
-
-### Docker Commands Reference
-
-```bash
-# Stop the container
-docker compose down
-
-# Restart the container
-docker compose restart
-
-# View logs
-docker compose logs -f
-
-# Rebuild after code changes
-docker compose up -d --build
-
-# Remove containers and volumes
-docker compose down -v
-```
-
-### Alternative: Manual Docker Build
-
-If you prefer not to use Docker Compose:
-
-```bash
-# Build the image
-docker build -t bank-data-api .
-
-# Run the container
-docker run -d \
-  --name bank-data-api \
-  -p 8080:8080 \
-  -e LOG_LEVEL=INFO \
-  -e LOG_FORMAT=detailed \
-  bank-data-api
-
-# View logs
-docker logs -f bank-data-api
-
-# Stop the container
-docker stop bank-data-api
-
-# Remove the container
-docker rm bank-data-api
-```
-
-### Custom Port Configuration
-
-To run on a different port:
-
-```bash
-# Using Docker Compose - edit docker-compose.yml:
-# ports:
-#   - "9000:8080"  # Maps host port 9000 to container port 8080
-
-# Using Docker run:
-docker run -d -p 9000:8080 bank-data-api
+git clone git@github.com:InformationSystemsAgency/bank-declaration-api-mockup.git
+cd bank-declaration-api-mockup
 ```
 
 ---
 
-## Option 2: Local Setup (Without Docker)
+## 1.2 Choose Your Setup Method
 
-### Step 1: Clone the Repository
+You can set up the application using either a **local Python environment** (recommended) or **Docker**.
+
+### Option A: Local Python Setup (Recommended)
+
+#### 1.3 Create a Virtual Environment
+
+Isolate the project dependencies in a Python virtual environment:
 
 ```bash
-git clone <repository-url>
-cd src-banks-trigger-app
-```
-
-### Step 2: Create Python Virtual Environment
-
-```bash
-# Create virtual environment
+# Create the virtual environment
 python3 -m venv venv
 
-# Activate virtual environment
-# On macOS/Linux:
+# Activate it
+# On Linux / macOS:
 source venv/bin/activate
 
 # On Windows:
 venv\Scripts\activate
 ```
 
-### Step 3: Install Dependencies
+Alternatively, use the provided setup script which handles this automatically:
+
+```bash
+chmod +x setup_env.sh
+./setup_env.sh
+```
+
+#### 1.4 Install Dependencies
+
+Install all required Python packages:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### Step 4: Configure Environment
+This installs: Flask, Flask-CORS, PyYAML, Gunicorn, and python-dotenv.
+
+### Option B: Docker Setup
+
+Alternatively, if you have Docker installed, you can skip the Python setup above and run:
 
 ```bash
-# Copy example configuration
-cp .env.example .env
-
-# Edit .env with your preferred settings
-nano .env  # or use any text editor
+# Build and start the container
+docker compose up --build -d
 ```
 
-### Step 5: Run the Application
+The server will start on port `8080`. Skip to **step 1.5** to configure your environment variables.
+
+---
+
+## 1.5 Configure Environment
+
+Copy the example environment file and edit it for your bank:
+
+```bash
+# Copy the example config
+cp .env.example .env
+
+# Edit with your settings
+nano .env
+```
+
+Or use the interactive setup script to generate it:
+
+```bash
+chmod +x setup_env.sh
+./setup_env.sh
+```
+
+Key settings to configure in `.env`:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `8080` | Port the server will listen on |
+| `HOST` | `0.0.0.0` | Bind to all interfaces so external connections work |
+| `FLASK_DEBUG` | `false` | Set to `true` only during development |
+| `LOG_LEVEL` | `INFO` | Logging verbosity: DEBUG, INFO, WARNING, ERROR, CRITICAL |
+| `LOG_FORMAT` | `detailed` | Log output format: simple, detailed, or json |
+| `SESSION_TTL_MINUTES` | `30` | How long sessions remain valid |
+| `RATE_LIMIT_MAX_REQUESTS` | `10` | Maximum requests per rate-limit window |
+
+---
+
+## 1.6 Run the Server
+
+**Option A: Using the start script**
+
+```bash
+chmod +x start.sh
+./start.sh
+```
+
+This script automatically sets up the virtual environment, installs dependencies, and starts the server.
+
+**Option B: Direct**
 
 ```bash
 python run.py
 ```
 
-The server will start at `http://localhost:8080`.
+The server will start on `http://0.0.0.0:8080` by default.
 
-### Step 6: Verify the Installation
-
-```bash
-# Test the API
-curl http://localhost:8080/
-
-# Open in browser
-open http://localhost:8080/docs/
-```
-
-### Using the Start Script (Alternative)
-
-A convenience script is available:
+**Option C: With Gunicorn (production)**
 
 ```bash
-# Make executable (first time only)
-chmod +x start.sh
-
-# Run the application
-./start.sh
+gunicorn --bind 0.0.0.0:8080 --workers 4 "app:create_app()"
 ```
 
-The script will:
-1. Create a virtual environment if it doesn't exist
-2. Install dependencies
-3. Start the application
-
----
-
-## Configuration
-
-### Environment Variables
-
-| Variable | Description | Default | Required |
-|----------|-------------|---------|----------|
-| `PORT` | Server port | `8080` | No |
-| `HOST` | Server host | `0.0.0.0` | No |
-| `FLASK_DEBUG` | Enable debug mode | `False` | No |
-| `LOG_LEVEL` | Logging level | `INFO` | No |
-| `LOG_FORMAT` | Log format | `detailed` | No |
-| `LOG_FILE` | Log file path | None (console) | No |
-| `SESSION_TTL_MINUTES` | Session timeout | `30` | No |
-| `RATE_LIMIT_WINDOW_SECONDS` | Rate limit window | `60` | No |
-| `RATE_LIMIT_MAX_REQUESTS` | Max requests per window | `10` | No |
-
-### Log Levels
-
-- `DEBUG` - Detailed debug information
-- `INFO` - General information (default)
-- `WARNING` - Warning messages
-- `ERROR` - Error messages only
-
-### Log Formats
-
-- `simple` - Basic log format: `LEVEL - message`
-- `detailed` - Detailed format: `timestamp - logger - LEVEL - message`
-- `json` - JSON structured logging (recommended for production)
-
----
-
-## Verification
-
-### Health Check
+**Option D: With Docker**
 
 ```bash
-curl http://localhost:8080/
-```
-
-Expected response:
-```json
-{
-  "message": "Bank Data API",
-  "version": "1.3a"
-}
-```
-
-### API Documentation
-
-Open in browser: `http://localhost:8080/docs/`
-
-### Test API Flow
-
-1. **Initiate data request:**
-```bash
-curl -X GET "http://localhost:8080/citizen/1234567890/BankingData"
-```
-
-2. **Check session status** (use sessionID from step 1):
-```bash
-curl -X GET "http://localhost:8080/request/{sessionID}"
-```
-
-3. **Retrieve data:**
-```bash
-curl -X GET "http://localhost:8080/citizen/1234567890/BankingData/{sessionID}"
-```
-
-### Test PSNs
-
-| PSN | Behavior |
-|-----|----------|
-| `1234567890` | Returns sample banking data |
-| `9876543210` | Returns different banking data |
-| `5555555555` | Returns all zero values |
-| `1111111111` | Will deny consent |
-| `3333333333` | Slow processing (PENDING state) |
-| `0000000000` | No data available (404) |
-
----
-
-## Troubleshooting
-
-### Docker Issues
-
-**Container won't start:**
-```bash
-# Check logs
-docker compose logs
-
-# Rebuild from scratch
-docker compose down
-docker compose build --no-cache
-docker compose up
-```
-
-**Port already in use:**
-```bash
-# Find process using port 8080
-lsof -i :8080
-
-# Kill the process or use a different port
-docker compose down
-# Edit docker-compose.yml to use a different port
 docker compose up -d
 ```
 
-### Local Setup Issues
-
-**Python version mismatch:**
-```bash
-# Check Python version
-python3 --version
-
-# Ensure Python 3.12+
-```
-
-**Module not found errors:**
-```bash
-# Ensure virtual environment is activated
-source venv/bin/activate
-
-# Reinstall dependencies
-pip install -r requirements.txt
-```
-
-**Permission denied on start.sh:**
-```bash
-chmod +x start.sh
-```
-
-### Common Errors
-
-**Connection refused:**
-- Verify the application is running
-- Check if the port is correct
-- Ensure no firewall is blocking the port
-
-**500 Internal Server Error:**
-- Check application logs for details
-- Verify environment configuration
-
 ---
 
-## Support
+## 1.7 Verify the Setup
 
-For issues and questions:
-1. Check the [Troubleshooting](#troubleshooting) section
-2. Review application logs
-3. Consult the API documentation at `/docs/`
+Confirm everything is running correctly:
+
+```bash
+# From your server (local check):
+curl http://localhost:8080/
+```
+
+If the setup is correct, you should see the API info page or a JSON response.
