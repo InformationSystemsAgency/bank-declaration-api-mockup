@@ -1,0 +1,11 @@
+services:
+  bank-mockup:
+    build: .
+    container_name: bank-mockup-server
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./banks.json:/app/banks.json:ro

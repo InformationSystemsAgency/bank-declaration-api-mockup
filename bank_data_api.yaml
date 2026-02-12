@@ -1,0 +1,218 @@
+openapi: 3.0.4
+info: 
+  title: Bank Data API
+  description: |
+    API specification for data exchange between banks and the SRC. All endpoints are exposed by the bank implementing the API and are called by the SRC.
+
+    **Live Environment:** [Test Declaration Triggering App](https://test-declaration.isaa.cloud/)
+
+    ## Usage
+
+    ### API Flow
+
+    1. **Initiate a data request** — `GET /citizen/{PSN}/BankingData` returns a `sessionID`.
+    2. **Poll the session status** — `GET /request/{sessionID}` returns HTTP 200 (READY), 202 (PENDING), 404 (EXPIRED), or 590 (DENIED).
+    3. **Retrieve the data** — Once status is READY, `GET /citizen/{PSN}/BankingData/{sessionID}` returns the banking data.
+
+    ### Sample PSNs for Testing
+
+    The application includes mock data for testing different scenarios:
+
+    | PSN | Behavior |
+    |-----|----------|
+    | `1234567890` | Returns sample banking data |
+    | `9876543210` | Returns different banking data |
+    | `5555555555` | Returns all zero values |
+    | `1111111111` | Will deny consent |
+    | `3333333333` | Slow processing (demonstrates PENDING state) |
+    | `0000000000` | No data available (returns 404) |
+  version: 1.3a
+paths:
+  /citizen/{PSN}/BankingData:
+    get:
+      tags:
+        - Bank to SRC
+      summary:
+         Initiates the data transfer process.
+      description: >
+         Initiates the data transfer process by indicating the interest of the requesting party (the SRC) to get data for a given data subject. The operation is asynchronous and will only return an operation ID, not actual data, if data could eventually be shared based on the consent of the data subject. The operation will return an error, if data for a given citizen is not available regardless of the consent of the data subject. Along with the session identifier, the time at which the session will be moved to `EXPIRED` status by the service provider may be indicated. 
+         
+         
+         A PSN can have one valid session at a time. Requesting a new session will expire the previous session generated for the PSN.
+         
+         
+         In addition to the PSN, the requesting party **MAY** specify a request identifier in the `X-Request-ID` header. If present, the service provider **MUST** include the value received in the logs created in relation to processing the request.
+      operationId: dataRequest
+      parameters:
+        - name: PSN
+          in: path
+          description: PSN of the citizen
+          required: true
+          schema: 
+            $ref: '#/components/schemas/PSN'
+        - name: X-Request-ID
+          in: header
+          required: false
+          schema:
+            $ref: '#/components/schemas/UUID'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: 
+                type: object
+                properties:
+                  sessionID:
+                    $ref: '#/components/schemas/UUID'
+                  expiresAt:
+                    description: Time (formatted accrording to RFC 3339, section 5.6) at which the session will be moved to `EXPIRED` status by the service provider.
+                    type: string
+                    format: date-time
+                required:
+                  - sessionID
+          links:
+            SessionStatus:
+              operationId: getSessionStatus
+              parameters:
+                sessionID: "$response.body#"
+                description: >
+                  The session identifier returned can be used to poll for the status of the session using the `sessionID` parameter in `GET /request/{sessionID}`
+            DataRetrieval:
+              operationId: getData
+              parameters:
+                sessionID: "$response.body#"
+                description: >
+                  The session identifier returned can be used to retrieve the data consented to by the data principal using the `sessionID` parameter in `GET /citizen/{PSN}/{sessionID}`      
+        '404':
+          description: The bank does not have information on the data subject.
+        '400':
+          description: The PSN supplied does not match the schema.
+
+  /request/{sessionID}:
+    get:
+      tags:
+        - Bank to SRC
+      summary:
+        Allows the requesting party to poll for the status of the data request.
+      description: >
+        Allows the requesting party to poll for the status of the data request. The permissible frequency of polling will be determined in the data exchange agreement. The operation is expected to return the status of the request as soon as possible without blocking or waiting for any other operations to complete. No content is returned, the status of he session is indicated by the status code. The following statuses are possible for the session:
+           * `READY` - Indicated by HTTP 200. Data consented to by the data principal (not necessarily all the requested data) is ready for retrieval. Request for data using the `getData` operation will be successful, if executed before the TTL specified in the data exchange agreement.         
+           * `PENDING` - Indicated by HTTP 202. The consent is either being acquired or data is being prepared for transfer. Request for data using `getData` will fail.
+           * `EXPIRED` - Indicated by HTTP 404. The request is either in the `EXPIRED` status or has not been created. The session will expire either because the TTL specified in the data exchange agreement has been exceeded, the consent from the data principal has not been possible to acquire in a time specified by the internal processes of the bank or because the session has been invalidated for other reasons such as multiple sessions being attempted for a given PSN. 
+           * `DENIED` - Indicated by HTTP 590. The data principal has explicitly denied to consent to any data being exchanged.
+           
+           
+           In addition to the session identifier, the requesting party **MAY** specify a request identifier in the `X-Request-ID` header. If present, the service provider **MUST** include the value received in the logs created in relation to processing the request.
+      operationId: getSesssionStatus
+      parameters:
+        - name: sessionID
+          in: path
+          description: Session identifier 
+          required: true
+          schema:
+            $ref: '#/components/schemas/UUID'
+        - name: X-Request-ID
+          in: header
+          required: false
+          schema:
+            $ref: '#/components/schemas/UUID'
+      responses:
+        '200':
+          description: Data is ready for retrieval. Request for data will be successful, if executed before the TTL specified in the data exchange agreement and no technical issues arise.
+        '202':
+          description: The request is in the `PENDING` status. The consent is either being acquired or data is being prepared for transfer. Request for data via xyz will fail.
+        '400':
+          description: The session identifier does not match the schema.
+        '404':
+          description: No such session. The request is either in the `EXPIRED` status (data may or may not have been previously available but is not available now) or has not been created.
+        '429':
+          description: Too many requests. The requesting party is polling too frequently.
+        '590':
+          description: The data principal denied the request for consent. The request is in the `DENIED` status.
+  /citizen/{PSN}/BankingData/{sessionID}:
+    get:
+      tags:
+        - Bank to SRC
+      summary:
+        Allows to download citizen data requested previously
+      description: >
+        Allows to download citizen data requested previously. The request takes the PSN as well as the session identifier as input to enforce an explicit relationship with the session initiation request. Data will be returned if and only if the session indicated by the sessionID matches the PSN provided. 
+        
+        
+        Data can be retrieved repeatedly, until the session expires. The operation will fail, if the session specified by the `sessionID` parameter is not in the `READY` state.
+        
+        
+        In addition to the PSN and session identifier, the requesting party **MAY** specify a request identifier in the `X-Request-ID` header. If present, the service provider **MUST** include the value received in the logs created in relation to processing the request.
+      operationId: getData
+      parameters:
+        - name: PSN
+          in: path
+          description: PSN of the citizen
+          required: true
+          schema: 
+            $ref: '#/components/schemas/PSN'
+        - name: sessionID
+          in: path
+          description: Session identifier 
+          required: true
+          schema:
+            $ref: '#/components/schemas/UUID'
+        - name: X-Request-ID
+          in: header
+          required: false
+          schema:
+            $ref: '#/components/schemas/UUID'
+      responses:
+        '200':
+          description: The requested data is available and is returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BankData'
+        '400':
+          description: The session identifier or the PSN do not match the schema.
+        '404':
+          description: >
+            The combination of the PSN and the session identifier does not a represent a dataset to be retrieved. This might be, because 
+             * The PSN does not match the session identifier
+             * The session identified by `sessionID` is not in the `READY` state or doesn't exist
+components:
+  schemas:
+    BankData:
+      type: object
+      description: 
+                Banking data of the citizen necessary for pre-filling of tax declaration. All attributes are mandatory and must contain a zero, if such income was not received or the data principal has not provided their consernt to share the data. In the latter case, inclusion of zero values instead of omitting the field prevents information about whether or not consent was given for specific data elements from leaking. For business rules regarding content of the data fields refer to CBA data exchange documentation.
+      properties:
+        DepositInterest:
+          type: number
+          minimum: 0
+          example: 250000
+        DebtSecurityInterest:
+          type: number
+          minimum: 0
+          example: 0
+        SecuritiesDeductable:
+          type: number
+          minimum: 0
+          example: 45000
+        NonPersonifiedIncome:
+          type: number
+          minimum: 0
+          example: 5640
+      required:
+        - DepositInterest
+        - DebtSecurityInterest
+        - SecuritiesDeductable
+        - NonPersonifiedIncome
+    PSN:
+      description: The PSN of a person. It must consist of exactly 10 digits.
+      type: string
+      pattern: '^[0-9]{10}$'
+      example: '1234567890'
+    UUID:
+      description: Unique identifier 
+      type: string
+      pattern: '^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$'
+      example: 'c1a35a20-427b-4492-904f-b91d9359cea1'
+    
