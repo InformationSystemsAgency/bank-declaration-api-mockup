@@ -1,8 +1,9 @@
 # Bank Data API
 
-A Flask application implementing the Bank Data API specification (version 1.3a) for secure data exchange between banks and the SRC (State Revenue Committee).
+A Mockup application implementing the Bank Data API specification (version 1.3a) for secure data exchange between banks 
+and the SRC (State Revenue Committee).
 
-## Live Environment
+## Testing Environment
 
 - **Test Declaration Triggering App**: https://test-declaration.isaa.cloud/
 
