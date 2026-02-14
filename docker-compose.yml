@@ -7,5 +7,3 @@ services:
     environment:
       - PORT=8080
       - LOG_LEVEL=INFO
-    volumes:
-      - ./banks.json:/app/banks.json:ro
